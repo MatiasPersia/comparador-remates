@@ -25,20 +25,19 @@ DEBUG = True
 
 BETANO = "https://blackfalcondata--betano-odds-api.apify.actor"
 B365 = "https://zen-studio--bet365-real-time-odds.apify.actor"
-# Hora de Argentina (-3) de forma segura sin depender de tzdata
 TZ = timezone(timedelta(hours=-3))
 
 _EXC = ("women", "(w)", "femen", "frauen", "u23", "u21", "u20", "u19", "u18", "u17", "youth", "juvenil",
         "reserve", "esoccer", "esports", "battle", "efootball", "cyber")
 
 LIGAS = {
-    "Brasil - Serie A": ((([("brazil", "brasil"), ("serie a", "brasileir")], ("serie b", "serie c", "femen", "women", "(w)", "u20", "u23", "carioca", "paulista", "estadual")), "brazil-serie-a"),
-    "Inglaterra - Premier League": ((([("england", "inglaterra"), ("premier league",)], ("women", "femen", "(w)", "2", "u21", "u18")), "england-premier-league"),
-    "Italia - Serie A": ((([("ital",), ("serie a",)], ("serie b", "serie c", "women", "femen")), "italy-serie-a"),
-    "Alemania - Bundesliga": ((([("german", "alemania"), ("bundesliga",)], ("2.", "ii", "segunda", "3.", "women", "(w)", "frauen", "femen", "junioren", "u19", "u17")), "germany-bundesliga-i"),
-    "España - LaLiga": ((([("spain", "espana"), ("laliga", "la liga", "primera divisi")], ("laliga 2", "la liga 2", "segunda", "hypermotion", "rfef", "federacion", "women", "(w)", "femen")), "spain-la-liga"),
-    "Champions League": ((([("champions league",)], ("women", "(w)", "femen", "afc", "caf", "concacaf", "youth", "juvenil", "esoccer", "esports", "battle", "efootball", "cyber")), "uefa-champions-league"),
-    "Europa League": ((([("europa league",)], ("women", "(w)", "femen", "conference", "caf", "afc", "esoccer", "esports", "battle", "efootball", "cyber")), "uefa-europa-league"),
+    "Brasil - Serie A": (([("brazil", "brasil"), ("serie a", "brasileir")], ("serie b", "serie c", "femen", "women", "(w)", "u20", "u23", "carioca", "paulista", "estadual")), "brazil-serie-a"),
+    "Inglaterra - Premier League": (([("england", "inglaterra"), ("premier league",)], ("women", "femen", "(w)", "2", "u21", "u18")), "england-premier-league"),
+    "Italia - Serie A": (([("ital",), ("serie a",)], ("serie b", "serie c", "women", "femen")), "italy-serie-a"),
+    "Alemania - Bundesliga": (([("german", "alemania"), ("bundesliga",)], ("2.", "ii", "segunda", "3.", "women", "(w)", "frauen", "femen", "junioren", "u19", "u17")), "germany-bundesliga-i"),
+    "España - LaLiga": (([("spain", "espana"), ("laliga", "la liga", "primera divisi")], ("laliga 2", "la liga 2", "segunda", "hypermotion", "rfef", "federacion", "women", "(w)", "femen")), "spain-la-liga"),
+    "Champions League": (([("champions league",)], ("women", "(w)", "femen", "afc", "caf", "concacaf", "youth", "juvenil", "esoccer", "esports", "battle", "efootball", "cyber")), "uefa-champions-league"),
+    "Europa League": (([("europa league",)], ("women", "(w)", "femen", "conference", "caf", "afc", "esoccer", "esports", "battle", "efootball", "cyber")), "uefa-europa-league"),
 }
 
 ALIAS = {
