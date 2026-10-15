@@ -5,13 +5,12 @@ import re
 import time
 import unicodedata
 from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
 import os
 
 import requests
 
 # ================= CONFIGURACIÓN =================
-APIFY_TOKEN = os.getenv("APIFY_TOKEN", "apify_api_h0s7VIJPCy4z2OY4zs0rhHhmbXiHWG3A8CLR")
+APIFY_TOKEN = os.getenv("APIFY_TOKEN", "")
 HORAS = 48
 MAX_PARTIDOS = 80
 MODO = "buscador"
@@ -26,7 +25,8 @@ DEBUG = True
 
 BETANO = "https://blackfalcondata--betano-odds-api.apify.actor"
 B365 = "https://zen-studio--bet365-real-time-odds.apify.actor"
-TZ = ZoneInfo("America/Argentina/Mendoza")
+# Hora de Argentina (-3) de forma segura sin depender de tzdata
+TZ = timezone(timedelta(hours=-3))
 
 _EXC = ("women", "(w)", "femen", "frauen", "u23", "u21", "u20", "u19", "u18", "u17", "youth", "juvenil",
         "reserve", "esoccer", "esports", "battle", "efootball", "cyber")
@@ -97,23 +97,136 @@ def sim(a, b):
     r = difflib.SequenceMatcher(None, a, b).ratio()
     return max(r, 0.85) if (a in b or b in a) else r
 
-def es_basura(nombre):
-    return any(b in f" {sin_tils := sin_tildes(nombre)} " for b in BASURA)
+PLANTILLA_HTML = r'''<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Comparador de remates: Betano y Bet365</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;600;700&display=swap">
+<style>
+:root{
+  --bg:#0e0c22; --surface:#17143b; --line:#2c2862; --text:#f3f1ff; --muted:#9b97c4;
+  --accent:#c6f24e; --accent-ink:#13230a; --focus:#9a96ff; --danger:#ff8585;
+  --sans:"Sora",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color-scheme:dark; box-sizing:border-box;
+}
+:root[data-theme="light"]{
+  --bg:#f6f5fc; --surface:#ffffff; --line:#d9d5ee; --text:#1b1840; --muted:#625e8a;
+  --accent:#4d8a00; --accent-ink:#ffffff; --focus:#4b46d6; --danger:#b3261e; color-scheme:light;
+}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.45}
+.wrap{max-width:760px;margin:0 auto;padding:22px 16px 24px}
+.cab{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+h1{font-size:26px;margin:0;font-weight:700}
+.sub{margin:6px 0 0;color:var(--muted)}
+.tema{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:transparent;cursor:pointer;color:var(--muted)}
+.meta{display:flex;flex-wrap:wrap;gap:4px 18px;margin:14px 0 0;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.filtros{margin:22px 0 0;display:grid;gap:12px;grid-template-columns:1fr 1fr}
+.filtros .ancho{grid-column:1/-1}
+.campo{display:grid;gap:5px;font-size:12px;color:var(--muted)}
+.campo select,.campo input{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--text)}
+.lista{list-style:none;margin:0;padding:0;display:grid;gap:12px;margin-top:18px}
+.tarjeta{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px}
+.tarjeta-header{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:8px}
+.tarjeta-titulo{font-weight:600;font-size:16px;color:var(--text);margin-bottom:12px}
+.cuotas-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center}
+.cuota-box{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
+.cuota-box.mejor{border-color:var(--accent)}
+.valor{font-size:20px;font-weight:700;font-family:var(--mono)}
+.valor.mejor{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="cab">
+    <div><h1>Remates por jugador</h1><p class="sub">Betano vs Bet365</p></div>
+    <button class="tema" id="tema">◐</button>
+  </header>
+  <p class="meta" id="meta"></p>
+  
+  <div class="filtros">
+    <div class="campo ancho">
+      <label>Buscar jugador o partido</label>
+      <input type="text" id="buscador" placeholder="Ej: Vinicius, Real Madrid...">
+    </div>
+  </div>
 
-# (Aquí va la lógica de extracción de partidos y cuotas tal como la tenías...)
+  <ul class="lista" id="lista"></ul>
+</div>
+
+<script>
+var DATA = /*__DATA__*/[];
+var META = /*__META__*/{};
+
+function render() {
+  const lista = document.getElementById('lista');
+  const filtro = document.getElementById('buscador').value.toLowerCase();
+  lista.innerHTML = '';
+
+  const filtrados = DATA.filter(item => 
+    item.j.toLowerCase().includes(filtro) || item.p.toLowerCase().includes(filtro) || item.l.toLowerCase().includes(filtro)
+  );
+
+  if(filtrados.length === 0) {
+    lista.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px;">No se encontraron resultados con ese criterio.</p>';
+    return;
+  }
+
+  filtrados.forEach(item => {
+    const li = document.createElement('li');
+    li.className = 'tarjeta';
+    li.innerHTML = `
+      <div class="tarjeta-header">
+        <span>${item.l} • ${item.h}</span>
+        <span><b>${item.t}</b> (Line: ${item.u})</span>
+      </div>
+      <div class="tarjeta-titulo">${item.p}</div>
+      <div style="font-size:14px;margin-bottom:10px;color:var(--muted)">Jugador: <b>${item.j}</b></div>
+      <div class="cuotas-grid">
+        <div class="cuota-box ${item.b > item.c ? 'mejor' : ''}">
+          <div style="font-size:12px">Betano</div>
+          <div class="valor ${item.b > item.c ? 'mejor' : ''}">${item.b.toFixed(2)}</div>
+        </div>
+        <div class="cuota-box ${item.c > item.b ? 'mejor' : ''}">
+          <div style="font-size:12px">Bet365</div>
+          <div class="valor ${item.c > item.b ? 'mejor' : ''}">${item.c.toFixed(2)}</div>
+        </div>
+      </div>
+    `;
+    lista.appendChild(li);
+  });
+
+  document.getElementById('meta').innerText = `Actualizado: ${META.generado || 'Reciente'} | Total partidos: ${DATA.length}`;
+}
+
+document.getElementById('buscador').addEventListener('input', render);
+document.getElementById('tema').addEventListener('click', () => {
+  const root = document.documentElement;
+  root.dataset.theme = root.dataset.theme === 'light' ? 'dark' : 'light';
+});
+
+render();
+</script>
+</body>
+</html>
+'''
 
 if __name__ == "__main__":
-    print("Iniciando comparador y generando datos para index.html...")
-    # Puedes dejar datos de prueba o la ejecución completa con Apify
-    filas_ejemplo = [{"p": "Partido Ejemplo", "l": "Europa League", "h": "15/10 13:45", "j": "Jugador 1", "j3": "Jugador 1", "t": "TOT", "u": 3, "b": 2.5, "c": 2.0, "d": 25.0}]
-    meta_ejemplo = {"generado": datetime.now(TZ).strftime("%d/%m %H:%M"), "difMin": 5, "titulo": "Actualizado desde GitHub Actions"}
+    print("Ejecutando comparador para generar index.html...")
     
-    # Cargamos tu HTML original y le inyectamos los datos
-    with open("index.html", "r", encoding="utf-8") as f:
-        plantilla_html = f.read()
+    filas_ejemplo = [
+        {"p": "Real Madrid vs Barcelona", "l": "España - LaLiga", "h": "Hoy 16:00", "j": "Kylian Mbappé", "t": "TOT", "u": 1.5, "b": 1.85, "c": 1.72, "d": 7.5},
+        {"p": "Arsenal vs Chelsea", "l": "Inglaterra - Premier League", "h": "Mañana 14:30", "j": "Cole Palmer", "t": "SOT", "u": 0.5, "b": 2.10, "c": 1.95, "d": 7.6}
+    ]
+    meta_ejemplo = {"generado": datetime.now(TZ).strftime("%d/%m %H:%M"), "difMin": 5}
     
-    # Si el HTML usa las marcas de datos, las reemplazamos:
-    # (Asegúrate de que tu index.html tenga las variables DATA y META definidas)
-    html_final = plantilla_html
-    
-    print("¡Proceso finalizado con éxito!")
+    html_final = PLANTILLA_HTML.replace("/*__DATA__*/[]", json.dumps(filas_ejemplo, ensure_ascii=False)) \
+                               .replace("/*__META__*/{}", json.dumps(meta_ejemplo, ensure_ascii=False))
+
+    with open("index.html", "w", encoding="utf-8") as f:
+        f.write(html_final)
+    print("¡index.html generado con éxito!")
