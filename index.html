@@ -15,15 +15,102 @@
   --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   color-scheme:dark; box-sizing:border-box;
 }
+:root[data-theme="light"]{
+  --bg:#f6f5fc; --surface:#ffffff; --line:#d9d5ee; --text:#1b1840; --muted:#625e8a;
+  --accent:#4d8a00; --accent-ink:#ffffff; --focus:#4b46d6; --danger:#b3261e; color-scheme:light;
+}
 body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.45}
 .wrap{max-width:760px;margin:0 auto;padding:22px 16px 24px}
+.cab{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+h1{font-size:26px;margin:0;font-weight:700}
+.sub{margin:6px 0 0;color:var(--muted)}
+.tema{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:transparent;cursor:pointer;color:var(--muted)}
+.meta{display:flex;flex-wrap:wrap;gap:4px 18px;margin:14px 0 0;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.filtros{margin:22px 0 0;display:grid;gap:12px;grid-template-columns:1fr 1fr}
+.filtros .ancho{grid-column:1/-1}
+.campo{display:grid;gap:5px;font-size:12px;color:var(--muted)}
+.campo select,.campo input{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--text)}
+.lista{list-style:none;margin:0;padding:0;display:grid;gap:12px;margin-top:18px}
+.tarjeta{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px}
+.tarjeta-header{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:8px}
+.tarjeta-titulo{font-weight:600;font-size:16px;color:var(--text);margin-bottom:12px}
+.cuotas-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center}
+.cuota-box{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
+.cuota-box.mejor{border-color:var(--accent)}
+.valor{font-size:20px;font-weight:700;font-family:var(--mono)}
+.valor.mejor{color:var(--accent)}
 </style>
 </head>
 <body>
-<div class="wrap"><h1>Remates por jugador</h1></div>
+<div class="wrap">
+  <header class="cab">
+    <div><h1>Remates por jugador</h1><p class="sub">Betano vs Bet365</p></div>
+    <button class="tema" id="tema">◐</button>
+  </header>
+  <p class="meta" id="meta"></p>
+  
+  <div class="filtros">
+    <div class="campo ancho">
+      <label>Buscar jugador o partido</label>
+      <input type="text" id="buscador" placeholder="Ej: Vinicius, Real Madrid...">
+    </div>
+  </div>
+
+  <ul class="lista" id="lista"></ul>
+</div>
+
 <script>
-var DATA = [{"p": "Partido Ejemplo", "j": "Jugador 1", "t": "TOT", "u": 3, "b": 2.5, "c": 2.0, "d": 25.0}];
-var META = {"generado": "15/10 01:12", "difMin": 5};
+var DATA = [{"p": "Real Madrid vs Barcelona", "l": "España - LaLiga", "h": "Hoy 16:00", "j": "Kylian Mbappé", "t": "TOT", "u": 1.5, "b": 1.85, "c": 1.72, "d": 7.5}, {"p": "Arsenal vs Chelsea", "l": "Inglaterra - Premier League", "h": "Mañana 14:30", "j": "Cole Palmer", "t": "SOT", "u": 0.5, "b": 2.1, "c": 1.95, "d": 7.6}];
+var META = {"generado": "15/10 01:27", "difMin": 5};
+
+function render() {
+  const lista = document.getElementById('lista');
+  const filtro = document.getElementById('buscador').value.toLowerCase();
+  lista.innerHTML = '';
+
+  const filtrados = DATA.filter(item => 
+    item.j.toLowerCase().includes(filtro) || item.p.toLowerCase().includes(filtro) || item.l.toLowerCase().includes(filtro)
+  );
+
+  if(filtrados.length === 0) {
+    lista.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px;">No se encontraron resultados con ese criterio.</p>';
+    return;
+  }
+
+  filtrados.forEach(item => {
+    const li = document.createElement('li');
+    li.className = 'tarjeta';
+    li.innerHTML = `
+      <div class="tarjeta-header">
+        <span>${item.l} • ${item.h}</span>
+        <span><b>${item.t}</b> (Line: ${item.u})</span>
+      </div>
+      <div class="tarjeta-titulo">${item.p}</div>
+      <div style="font-size:14px;margin-bottom:10px;color:var(--muted)">Jugador: <b>${item.j}</b></div>
+      <div class="cuotas-grid">
+        <div class="cuota-box ${item.b > item.c ? 'mejor' : ''}">
+          <div style="font-size:12px">Betano</div>
+          <div class="valor ${item.b > item.c ? 'mejor' : ''}">${item.b.toFixed(2)}</div>
+        </div>
+        <div class="cuota-box ${item.c > item.b ? 'mejor' : ''}">
+          <div style="font-size:12px">Bet365</div>
+          <div class="valor ${item.c > item.b ? 'mejor' : ''}">${item.c.toFixed(2)}</div>
+        </div>
+      </div>
+    `;
+    lista.appendChild(li);
+  });
+
+  document.getElementById('meta').innerText = `Actualizado: ${META.generado || 'Reciente'} | Total partidos: ${DATA.length}`;
+}
+
+document.getElementById('buscador').addEventListener('input', render);
+document.getElementById('tema').addEventListener('click', () => {
+  const root = document.documentElement;
+  root.dataset.theme = root.dataset.theme === 'light' ? 'dark' : 'light';
+});
+
+render();
 </script>
 </body>
 </html>
